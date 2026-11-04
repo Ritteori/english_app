@@ -130,7 +130,6 @@
     .status-line.good { color:var(--green); font-weight:750; }
     .status-line.bad { color:var(--red); font-weight:750; }
     .status-line.warn { color:var(--yellow); }
-    .status-line.live { color:#8de5c5; font-weight:650; }
     .answer-result { z-index:1; display:none; margin-top:18px; padding:13px 17px; border-radius:15px; max-width:100%; background:rgba(255,255,255,.045); border:1px solid var(--line); }
     .answer-result.show { display:block; }
     .answer-result .answer-label { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.12em; font-weight:800; }
@@ -193,7 +192,7 @@
         <span>wordwave</span>
       </div>
       <div class="top-actions">
-        <span class="privacy-pill">WORDS STORED LOCALLY</span>
+        <span class="privacy-pill">PRIVATE · LOCAL</span>
         <button class="icon-btn" id="backupBtn" title="Экспорт всех наборов" aria-label="Экспорт всех наборов"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></button>
         <button class="icon-btn" id="restoreBtn" title="Импорт JSON" aria-label="Импорт JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></button>
         <input class="file-input" id="restoreFile" type="file" accept="application/json,.json">
@@ -227,7 +226,7 @@
           <div class="toolbar-row"><span class="section-note" id="totalWords">0 слов · 0 наборов</span></div>
         </div>
         <div class="packs-grid" id="packsGrid"></div>
-        <p class="storage-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 4v5h8V4M8 15h8"/></svg><span>Словари и статистика хранятся локально в этом браузере. Голос обрабатывает встроенный сервис браузера: например, Chrome может отправлять аудио на сервер распознавания. Экспортируй JSON-копию, чтобы перенести словари и статистику.</span></p>
+        <p class="storage-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 4v5h8V4M8 15h8"/></svg><span>Все данные хранятся локально в этом браузере. Экспортируй JSON-копию и импортируй её на другом устройстве, чтобы перенести словари и статистику.</span></p>
       </section>
 
       <section class="view" id="studyView">
@@ -253,8 +252,9 @@
             <div class="study-controls">
               <button class="btn mic-btn" id="startMicBtn">🎙 Начать запись</button>
               <button class="btn btn-secondary" id="repeatWordBtn">↻ Повторить слово</button>
+              <button class="btn btn-ghost" id="skipBtn">Не знаю / Пропустить →</button>
             </div>
-            <p class="study-hint" id="studyHint">После озвучки микрофон включится автоматически. Скажи перевод или произнеси «skip», чтобы пропустить карточку.</p>
+            <p class="study-hint" id="studyHint">После озвучки микрофон включится автоматически. Говори отчётливо, когда увидишь пульсацию.</p>
           </div>
         </div>
         <div class="panel finish-card" id="finishCard" style="display:none">
@@ -299,8 +299,6 @@
       recognition: null,
       recognitionAttempt: 0,
       recognitionGotResult: false,
-      recognitionFinalText: '',
-      recognitionInterimText: '',
       intentionalStop: false,
       listenWatchdog: null,
       advanceTimer: null,
@@ -414,64 +412,6 @@
 
     function splitAnswers(value) {
       return String(value || '').split(/[;|]/).map(s => s.trim()).filter(Boolean);
-    }
-
-    // Conservative ASR tolerance: accept only an a/u substitution in a single
-    // English word (4+ letters), e.g. "tusk" -> "task". This is intentionally
-    // narrower than generic edit distance to avoid accepting many minimal pairs.
-    function isLikelyVowelASRVariant(candidate, expected) {
-      const heard = normalizeAnswer(candidate);
-      const target = normalizeAnswer(expected);
-      if (heard.length < 4 || target.length < 4 || heard.length !== target.length) return false;
-      if (!/^[a-z]+$/.test(heard) || !/^[a-z]+$/.test(target)) return false;
-      let mismatch = -1;
-      for (let i = 0; i < heard.length; i++) {
-        if (heard[i] === target[i]) continue;
-        if (mismatch !== -1) return false;
-        const confusion = `${heard[i]}:${target[i]}`;
-        if (confusion !== 'a:u' && confusion !== 'u:a') return false;
-        mismatch = i;
-      }
-      return mismatch !== -1;
-    }
-
-    function compareRecognizedAnswer(candidates, word) {
-      const rawExpected = splitAnswers(word?.answer || '');
-      const expected = rawExpected.map(raw => ({ raw, normalized: normalizeAnswer(raw) })).filter(x => x.normalized);
-      const heard = [...new Set((candidates || []).map(normalizeAnswer).filter(Boolean))];
-
-      // Exact match always wins, including any alternative returned by the browser.
-      for (const candidate of heard) {
-        const exact = expected.find(item => item.normalized === candidate);
-        if (exact) return { matched: true, fuzzy: false, expected: exact.raw, recognized: candidate };
-      }
-
-      // Only allow one a/u substitution for a one-word English answer.
-      for (const candidate of heard) {
-        if (candidate.includes(' ')) continue;
-        const close = expected.find(item => !item.normalized.includes(' ') && isLikelyVowelASRVariant(candidate, item.normalized));
-        if (close) return { matched: true, fuzzy: true, expected: close.raw, recognized: candidate };
-      }
-      return { matched: false, fuzzy: false, expected: '', recognized: heard[0] || '' };
-    }
-
-    function isVoiceSkipCommand(candidates, word) {
-      const expected = splitAnswers(word?.answer || '').map(normalizeAnswer).filter(Boolean);
-      // Do not steal a legitimate answer such as "skip" or "to skip".
-      if (expected.some(answer => answer.split(' ').some(token => token.startsWith('skip')))) return false;
-      return (candidates || []).some(candidate => normalizeAnswer(candidate) === 'skip');
-    }
-
-    function processVoiceTranscript(transcript, alternatives = []) {
-      const word = state.currentPack?.words[state.order[state.index]];
-      if (!word) return;
-      const candidates = [transcript, ...alternatives].filter(Boolean);
-      if (isVoiceSkipCommand(candidates, word)) {
-        skipWord(true);
-        return;
-      }
-      const match = compareRecognizedAnswer(candidates, word);
-      handleAnswer(transcript, match.matched, false, match);
     }
 
     function parseWordList(text) {
@@ -618,21 +558,14 @@
     }
 
     function recognitionStalled(rec) {
-      if (state.recognition !== rec) return;
-      clearTimeout(state.listenWatchdog);
-      const transcript = state.recognitionFinalText || state.recognitionInterimText;
-      if (transcript) {
-        processVoiceTranscript(transcript, []);
-        return;
-      }
+      if (state.recognition !== rec || state.recognitionGotResult) return;
       try { rec.abort(); } catch (_) {}
       state.recognition = null;
       $('studyCard').classList.remove('listening');
       state.phase = 'waiting';
-      setStatus('Не получил текст от распознавания за 20 секунд. Попробуй ещё раз или введи ответ.', 'warn');
+      setStatus('Распознавание зависло или не услышало ответ. Попробуй ещё раз.', 'warn');
       showManualInput(true);
       $('startMicBtn').textContent = '🎙 Повторить запись';
-      $('studyHint').textContent = 'Индикатор микрофона означает, что браузер открыл аудиосессию, но распознавание могло не вернуть текст. Проверь интернет и попробуй официальный Google Chrome; можно ответить вручную.';
     }
 
     async function beginStudy(packId) {
@@ -665,7 +598,7 @@
       $('micOrb').style.display = 'grid';
       $('startMicBtn').style.display = 'inline-flex';
       $('startMicBtn').textContent = '🎙 Начать запись';
-      $('studyHint').textContent = 'После озвучки микрофон включится автоматически. Чтобы пропустить карточку, скажи «skip». Если «skip» — правильный перевод, ответ будет засчитан как обычно.';
+      $('studyHint').textContent = 'После озвучки микрофон включится автоматически. Если Safari не запустит его сам, нажми «Начать запись».';
       updateProgress();
       setStatus('Слушай русское слово…');
       const spoken = await speak(word.prompt, 'ru-RU');
@@ -680,180 +613,85 @@
       if (!state.currentPack || state.phase === 'checking' || state.phase === 'result' || state.phase === 'finished') return;
       const Recognition = recognitionCtor();
       if (!Recognition) {
-        setStatus('В этом браузере нет SpeechRecognition. Введи ответ вручную.', 'warn');
+        setStatus('Распознавание речи недоступно в этом браузере. Введи ответ вручную.', 'warn');
         showManualInput(true); $('startMicBtn').style.display = 'none';
-        $('studyHint').textContent = 'Для голосового режима попробуй актуальный официальный Google Chrome. Ручная проверка доступна всегда.';
+        $('studyHint').textContent = 'Попробуй Safari или Chrome с поддержкой SpeechRecognition. Ручная проверка доступна всегда.';
         return;
       }
-
-      clearTimeout(state.listenWatchdog);
       stopRecognition();
       cancelSpeech();
-      state.phase = 'listening';
-      state.recognitionAttempt++;
+      state.phase = 'listening'; state.recognitionAttempt++;
       state.recognitionGotResult = false;
-      state.recognitionFinalText = '';
-      state.recognitionInterimText = '';
-
-      let rec;
-      try {
-        rec = new Recognition();
-      } catch (error) {
-        state.phase = 'waiting';
-        setStatus(`Не удалось создать распознавание: ${error.message || error}`, 'warn');
-        showManualInput(true);
-        return;
-      }
+      const rec = new Recognition();
       state.recognition = rec;
-      rec.lang = 'en-US';
-      rec.continuous = false;
-      // Показываем пользователю промежуточные слова, не дожидаясь финального ответа.
-      rec.interimResults = true;
-      rec.maxAlternatives = 5;
-
-      const isActive = () => state.recognition === rec && state.phase === 'listening';
-      const armWatchdog = () => {
-        clearTimeout(state.listenWatchdog);
-        state.listenWatchdog = setTimeout(() => recognitionStalled(rec), 20000);
-      };
-
+      rec.lang = 'en-US'; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
       rec.onstart = () => {
-        if (!isActive()) return;
-        $('studyCard').classList.add('listening');
-        setStatus('Микрофон подключён. Говори по-английски…', 'live');
+        if (state.recognition !== rec) return;
+        state.phase = 'listening'; $('studyCard').classList.add('listening');
+        setStatus('Слушаю… Говори сейчас');
         $('startMicBtn').textContent = '🎙 Слушаю…';
-        armWatchdog();
-      };
-
-      rec.onaudiostart = () => {
-        if (!isActive()) return;
-        setStatus('Аудиоканал открыт. Скажи перевод…', 'live');
-      };
-
-      rec.onspeechstart = () => {
-        if (!isActive()) return;
-        setStatus('Речь обнаружена…', 'live');
-        armWatchdog();
-      };
-
-      rec.onspeechend = () => {
-        if (!isActive()) return;
-        setStatus('Обрабатываю услышанное…', 'live');
-        armWatchdog();
-      };
-
-      rec.onresult = (event) => {
-        if (!isActive()) return;
-        const finalParts = [];
-        const interimParts = [];
-        const alternatives = [];
-
-        // В разных движках resultIndex и состав results отличаются.
-        // Перебираем весь список, чтобы не потерять сегменты фразы.
-        for (let resultIndex = 0; resultIndex < event.results.length; resultIndex++) {
-          const result = event.results[resultIndex];
-          if (!result) continue;
-          const firstTranscript = String(result[0]?.transcript || '').trim();
-          if (result.isFinal) {
-            if (firstTranscript) finalParts.push(firstTranscript);
-            for (let altIndex = 0; altIndex < result.length; altIndex++) {
-              const candidate = String(result[altIndex]?.transcript || '').trim();
-              if (candidate) alternatives.push(candidate);
-            }
-          } else if (firstTranscript) {
-            interimParts.push(firstTranscript);
-          }
-        }
-
-        state.recognitionFinalText = finalParts.join(' ').replace(/\s+/g, ' ').trim();
-        state.recognitionInterimText = interimParts.join(' ').replace(/\s+/g, ' ').trim();
-
-        if (state.recognitionFinalText) {
-          clearTimeout(state.listenWatchdog);
-          state.recognitionGotResult = true;
-          const transcript = state.recognitionFinalText;
-          setStatus(`Распознано: ${transcript}`, 'live');
-          processVoiceTranscript(transcript, alternatives);
-          return;
-        }
-
-        if (state.recognitionInterimText) {
-          setStatus(`Слышу: ${state.recognitionInterimText}`, 'live');
-          armWatchdog();
-        }
-      };
-
-      rec.onnomatch = () => {
-        if (!isActive()) return;
-        setStatus('Речь была, но браузер не смог распознать английские слова. Попробуй ещё раз.', 'warn');
-      };
-
-      rec.onerror = (event) => {
-        if (state.recognition !== rec || state.phase === 'result' || state.phase === 'checking') return;
         clearTimeout(state.listenWatchdog);
-        state.recognition = null;
+        state.listenWatchdog = setTimeout(() => recognitionStalled(rec), 12000);
+      };
+      rec.onresult = (event) => {
+        if (state.recognition !== rec || state.phase !== 'listening') return;
+        clearTimeout(state.listenWatchdog); state.recognitionGotResult = true;
+        const alternatives = [];
+        const result = event.results?.[event.resultIndex || 0];
+        if (result) for (let i = 0; i < result.length; i++) if (result[i]?.transcript) alternatives.push(result[i].transcript.trim());
+        const transcript = alternatives[0] || '';
+        const word = state.currentPack.words[state.order[state.index]];
+        const expected = splitAnswers(word.answer).map(normalizeAnswer).filter(Boolean);
+        const match = alternatives.some(candidate => expected.includes(normalizeAnswer(candidate)));
+        handleAnswer(transcript, match, false);
+      };
+      rec.onerror = (event) => {
+        if (state.recognition !== rec || state.phase === 'result') return;
+        clearTimeout(state.listenWatchdog); state.recognition = null;
         $('studyCard').classList.remove('listening');
         const messages = {
-          'not-allowed':'Доступ к микрофону запрещён. Разреши микрофон для этого сайта в настройках браузера.',
-          'service-not-allowed':'Браузер запретил сервис распознавания речи.',
-          'no-speech':'Браузер не обнаружил речь. Говори сразу после включения микрофона и немного громче.',
-          'audio-capture':'Не удалось получить аудио с микрофона. Проверь, не занят ли он другим приложением.',
-          'network':'Не удалось подключиться к сервису распознавания. Проверь интернет или попробуй официальный Google Chrome.',
+          'not-allowed':'Нет доступа к микрофону. Разреши микрофон для сайта в настройках Safari.',
+          'service-not-allowed':'Сервис распознавания речи запрещён браузером.',
+          'no-speech':'Не услышал речь. Попробуй говорить чуть громче.',
+          'audio-capture':'Не удалось подключиться к микрофону.',
+          'network':'Ошибка сетевого сервиса распознавания. Проверь интернет.',
           'aborted':'Запись остановлена.'
         };
-        const message = messages[event.error] || `Ошибка распознавания (${event.error || 'unknown'}).`;
+        const message = messages[event.error] || `Ошибка распознавания: ${event.error || 'неизвестно'}.`;
         state.phase = 'waiting';
         setStatus(message, 'warn');
         showManualInput(true);
         $('startMicBtn').textContent = '🎙 Повторить запись';
-        $('studyHint').textContent = event.error === 'network'
-          ? 'Важно: в Chrome распознавание часто выполняется удалённым сервисом и требует интернета. GPU и Docker на это не влияют. Если network повторяется, можно временно вводить ответ вручную или позже подключить локальный Whisper.'
-          : 'Попробуй повторить запись. Если проблема повторяется, проверь разрешение микрофона, выбранное устройство ввода и настройки браузера.';
-        console.warn('[Wordwave] SpeechRecognition error:', event.error, event.message || '');
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          $('studyHint').textContent = 'Проверь разрешение микрофона и включена ли Siri: Safari использует системный движок распознавания Apple.';
+        }
       };
-
       rec.onend = () => {
         if (state.recognition !== rec) return;
-        clearTimeout(state.listenWatchdog);
-        state.recognition = null;
+        clearTimeout(state.listenWatchdog); state.recognition = null;
         $('studyCard').classList.remove('listening');
-        if (state.phase !== 'listening') return;
-
-        // Некоторые движки завершают сессию только с interim-результатом.
-        const transcript = state.recognitionFinalText || state.recognitionInterimText;
-        if (transcript) {
-          processVoiceTranscript(transcript, []);
-          return;
+        if (!state.recognitionGotResult && state.phase === 'listening') {
+          state.phase = 'waiting';
+          setStatus('Не удалось распознать ответ. Попробуй ещё раз или введи его.', 'warn');
+          showManualInput(true); $('startMicBtn').textContent = '🎙 Повторить запись';
         }
-
-        state.phase = 'waiting';
-        setStatus('Запись завершилась, но текст не получен. Нажми «Повторить запись» или введи ответ.', 'warn');
-        showManualInput(true);
-        $('startMicBtn').textContent = '🎙 Повторить запись';
       };
-
       try {
-        setStatus('Запускаю распознавание…', 'live');
-        $('startMicBtn').textContent = '🎙 Подключаюсь…';
-        showManualInput(false);
         rec.start();
-        // Защита на случай, если браузер не вызовет ни onstart, ни onerror, ни onend.
-        armWatchdog();
+        // Some WebKit builds may never dispatch onstart/onerror/onend. Keep a guard even before onstart.
+        state.listenWatchdog = setTimeout(() => recognitionStalled(rec), 16000);
+        $('startMicBtn').textContent = '🎙 Запись';
+        showManualInput(false);
       } catch (error) {
-        state.recognition = null;
-        state.phase = 'waiting';
+        state.recognition = null; state.phase = 'waiting';
         $('studyCard').classList.remove('listening');
-        const detail = error?.name === 'InvalidStateError'
-          ? 'Распознавание уже запущено. Подожди секунду и повтори.'
-          : (error?.message || 'Проверь разрешения микрофона.');
-        setStatus(`Браузер не смог начать запись: ${detail}`, 'warn');
-        $('startMicBtn').textContent = '🎙 Повторить запись';
+        setStatus(fromUser ? 'Браузер не смог включить микрофон. Проверь разрешения.' : 'Safari не запустил микрофон автоматически. Нажми «Начать запись».', 'warn');
+        $('startMicBtn').textContent = '🎙 Начать запись';
         showManualInput(true);
-        console.warn('[Wordwave] SpeechRecognition start failed:', error);
       }
     }
 
-    async function handleAnswer(transcript, matched, manual, matchInfo = null) {
+    async function handleAnswer(transcript, matched, manual) {
       if (state.phase === 'result' || state.phase === 'finished') return;
       stopRecognition(); cancelSpeech();
       state.phase = 'checking';
@@ -863,17 +701,14 @@
       word.stats.lastSeenAt = Date.now();
       $('answerResult').classList.add('show');
       $('answerValue').textContent = splitAnswers(word.answer).join(' / ');
-      $('heardValue').textContent = transcript
-        ? (matchInfo?.fuzzy ? `Распознано как «${transcript}», засчитано как «${matchInfo.expected}»` : `Ты сказал: ${transcript}`)
-        : (manual ? 'Ответ введён вручную' : '');
+      $('heardValue').textContent = transcript ? `Ты сказал: ${transcript}` : (manual ? 'Ответ введён вручную' : '');
       $('answerLabel').textContent = 'Правильный перевод';
       $('startMicBtn').style.display = 'none';
       $('micOrb').style.display = 'none';
       showManualInput(false);
       if (matched) {
         state.correct++; word.stats.correct = (word.stats.correct || 0) + 1;
-        state.phase = 'result';
-        setStatus(matchInfo?.fuzzy ? `Похоже, распознавание ошиблось — засчитано как «${matchInfo.expected}» 🎉` : 'Правильно! 🎉', 'good');
+        state.phase = 'result'; setStatus('Правильно! 🎉', 'good');
         state.advanceTimer = setTimeout(advance, 1500);
       } else {
         state.wrong++; word.stats.wrong = (word.stats.wrong || 0) + 1;
@@ -885,17 +720,17 @@
       try { await updateWordRecord(word); } catch (error) { console.error(error); showToast('Не удалось сохранить статистику.'); }
     }
 
-    async function skipWord(fromVoice = false) {
-      if (!state.currentPack || state.phase === 'checking' || state.phase === 'result' || state.phase === 'finished') return;
+    async function skipWord() {
+      if (!state.currentPack || state.phase === 'result' || state.phase === 'finished') return;
       clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech();
       const word = state.currentPack.words[state.order[state.index]];
       word.stats = word.stats || { correct:0, wrong:0, skipped:0, seen:0, lastSeenAt:null };
       word.stats.skipped = (word.stats.skipped || 0) + 1; word.stats.lastSeenAt = Date.now();
       state.skipped++; state.phase = 'result';
       $('answerResult').classList.add('show'); $('answerLabel').textContent = 'Правильный ответ';
-      $('answerValue').textContent = splitAnswers(word.answer).join(' / '); $('heardValue').textContent = fromVoice ? 'Команда голосом: skip' : 'Слово пропущено';
+      $('answerValue').textContent = splitAnswers(word.answer).join(' / '); $('heardValue').textContent = 'Слово пропущено';
       $('startMicBtn').style.display = 'none'; $('micOrb').style.display = 'none'; showManualInput(false);
-      setStatus(fromVoice ? 'Пропускаю по голосовой команде…' : 'Ничего страшного — запоминаем!');
+      setStatus('Ничего страшного — запоминаем!');
       try { await updateWordRecord(word); } catch (error) { console.error(error); }
       await speak(`The answer is ${splitAnswers(word.answer)[0] || word.answer}`, 'en-US');
       state.advanceTimer = setTimeout(advance, 2500);
@@ -1031,6 +866,7 @@
     $('backHomeBtn').addEventListener('click', async () => { clearTimeout(state.advanceTimer); stopRecognition(); cancelSpeech(); state.phase = 'idle'; setView('home'); await refreshHome(); });
     $('finishHomeBtn').addEventListener('click', async () => { state.phase = 'idle'; setView('home'); await refreshHome(); });
     $('restartBtn').addEventListener('click', () => state.currentPack && beginStudy(state.currentPack.id));
+    $('skipBtn').addEventListener('click', skipWord);
     $('startMicBtn').addEventListener('click', () => startListening(true));
     $('repeatWordBtn').addEventListener('click', async () => {
       if (!state.currentPack || state.phase === 'result') return;

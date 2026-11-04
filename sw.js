@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wordwave-shell-v3';
+const CACHE_NAME = 'wordwave-shell-v1';
 const APP_SHELL = [
   './',
   './index.html',
