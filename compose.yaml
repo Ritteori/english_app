@@ -1,0 +1,7 @@
+services:
+  wordwave:
+    build: .
+    container_name: wordwave
+    ports:
+      - "8080:80"
+    restart: unless-stopped

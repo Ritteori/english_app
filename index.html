@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Wordwave — личные наборы английских слов и голосовые тренировки.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Wordwave">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <title>Wordwave — английский голосом</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090d18;
+      --bg-soft: #101727;
+      --panel: rgba(20, 29, 47, .88);
+      --panel-solid: #151e30;
+      --panel-2: #1a263b;
+      --line: rgba(166, 188, 226, .13);
+      --text: #f4f7ff;
+      --muted: #9ba9c2;
+      --muted-2: #74839f;
+      --accent: #86a8ff;
+      --accent-2: #5b7ff0;
+      --green: #50d6a0;
+      --red: #ff7585;
+      --yellow: #ffc978;
+      --shadow: 0 24px 80px rgba(0,0,0,.34);
+      --radius: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--bg); }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      background:
+        radial-gradient(800px 500px at 12% -12%, rgba(85,119,217,.22), transparent 66%),
+        radial-gradient(700px 500px at 100% 20%, rgba(71,174,164,.10), transparent 62%),
+        linear-gradient(160deg, #0b1020 0%, #090d18 58%, #0c1321 100%);
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .shell { width: min(100% - 32px, 980px); margin: 0 auto; padding: 22px 0 60px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:48px; }
+    .brand { display:flex; align-items:center; gap:11px; font-weight:760; letter-spacing:-.04em; font-size:20px; }
+    .brand-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:13px; background:linear-gradient(145deg,#9bb6ff,#5878e8); color:#091126; box-shadow:0 8px 24px rgba(91,127,240,.24); }
+    .brand-mark svg { width:22px; height:22px; }
+    .top-actions { display:flex; align-items:center; gap:9px; }
+    .privacy-pill { color:#9eb0ce; border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:11px; letter-spacing:.11em; font-weight:700; }
+    .icon-btn { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--line); border-radius:14px; color:var(--muted); background:rgba(255,255,255,.035); cursor:pointer; }
+    .icon-btn svg { width:18px; height:18px; }
+    .view { display:none; animation:fade-in .28s ease both; }
+    .view.active { display:block; }
+    @keyframes fade-in { from {opacity:0; transform:translateY(7px)} to {opacity:1; transform:translateY(0)} }
+    .eyebrow { margin:0 0 12px; color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:0; font-size:clamp(32px,6vw,54px); line-height:1.03; letter-spacing:-.055em; font-weight:760; }
+    h2 { margin:0; font-size:22px; letter-spacing:-.035em; }
+    h3 { margin:0; font-size:16px; letter-spacing:-.02em; }
+    p { line-height:1.55; }
+    .hero-copy { max-width:580px; margin:16px 0 30px; color:var(--muted); font-size:16px; }
+    .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:34px 0 14px; }
+    .section-note { color:var(--muted-2); font-size:12px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .import-panel { padding:22px; }
+    .field-label { display:block; margin:0 0 8px; color:#c8d3e7; font-size:13px; font-weight:650; }
+    .text-input, .text-area {
+      width:100%; border:1px solid rgba(166,188,226,.16); border-radius:15px; color:var(--text);
+      background:rgba(4,8,17,.45); padding:14px 15px; transition:border-color .18s, box-shadow .18s;
+    }
+    .text-input::placeholder, .text-area::placeholder { color:#62718c; }
+    .text-area { display:block; min-height:190px; resize:vertical; line-height:1.6; font-size:14px; }
+    .text-input:focus, .text-area:focus { outline:none; border-color:rgba(134,168,255,.65); box-shadow:0 0 0 3px rgba(134,168,255,.09); }
+    .field-row { display:grid; grid-template-columns:1fr 1.4fr; gap:14px; }
+    .field { min-width:0; margin-bottom:16px; }
+    .hint { color:var(--muted-2); font-size:12px; line-height:1.5; margin:9px 0 0; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-height:46px; padding:0 17px; border:1px solid transparent; border-radius:14px; color:#091126; background:linear-gradient(135deg,#a8bdff,#7898ff); font-weight:760; cursor:pointer; transition:transform .16s, filter .16s, opacity .16s; }
+    .btn:hover { filter:brightness(1.06); transform:translateY(-1px); }
+    .btn:active { transform:translateY(0) scale(.99); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+    .btn svg { width:17px; height:17px; }
+    .btn-secondary { color:#dce6fa; background:rgba(255,255,255,.055); border-color:var(--line); }
+    .btn-ghost { min-height:40px; color:#b6c4dd; background:transparent; border-color:var(--line); padding:0 12px; font-size:13px; }
+    .btn-danger { color:#ffadb7; background:rgba(255,117,133,.09); border-color:rgba(255,117,133,.2); }
+    .form-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:16px; }
+    .import-feedback { display:none; padding:11px 13px; margin-top:14px; border-radius:12px; background:rgba(255,201,120,.08); border:1px solid rgba(255,201,120,.18); color:#f3ce95; font-size:13px; line-height:1.5; }
+    .import-feedback.show { display:block; }
+    .packs-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+    .pack-card { position:relative; overflow:hidden; padding:18px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,rgba(26,38,59,.92),rgba(16,24,39,.96)); }
+    .pack-card::after { content:""; position:absolute; width:125px; height:125px; right:-60px; top:-65px; border-radius:50%; background:rgba(129,160,255,.09); pointer-events:none; }
+    .pack-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .pack-name { overflow-wrap:anywhere; font-size:17px; font-weight:730; letter-spacing:-.025em; }
+    .pack-count { flex-shrink:0; padding:6px 9px; border:1px solid var(--line); border-radius:999px; color:#aebbd2; font-size:11px; }
+    .pack-meta { min-height:34px; color:var(--muted-2); font-size:12px; margin:9px 0 14px; }
+    .pack-stats { color:#aebdd5; font-size:11px; margin-bottom:14px; }
+    .pack-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .pack-actions .btn { min-height:38px; padding:0 12px; font-size:12px; }
+    .empty { padding:34px 20px; text-align:center; border:1px dashed rgba(166,188,226,.2); border-radius:20px; color:var(--muted); }
+    .empty strong { display:block; margin-bottom:6px; color:#dfe7f6; }
+    .empty-icon { width:42px; height:42px; margin:0 auto 13px; display:grid; place-items:center; border-radius:15px; background:rgba(134,168,255,.1); color:var(--accent); font-size:21px; }
+    .toolbar-row { display:flex; gap:9px; flex-wrap:wrap; }
+    .storage-note { margin:26px 0 0; display:flex; align-items:flex-start; gap:9px; color:#8291ab; font-size:12px; line-height:1.5; }
+    .storage-note svg { flex:none; width:16px; height:16px; margin-top:1px; color:#8ba8ef; }
+
+    /* Study */
+    .study-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 22px; }
+    .back-btn { border:0; padding:8px 0; color:var(--muted); background:none; font-weight:650; cursor:pointer; }
+    .back-btn:hover { color:var(--text); }
+    .study-pack-name { color:var(--muted); font-size:13px; text-align:right; }
+    .progress-block { margin:0 auto 28px; max-width:700px; }
+    .progress-label { display:flex; justify-content:space-between; gap:10px; margin-bottom:9px; color:#b7c4da; font-size:12px; font-weight:650; }
+    .progress-track { width:100%; height:6px; border-radius:99px; overflow:hidden; background:rgba(255,255,255,.08); }
+    .progress-fill { width:0%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#7898ff,#62d6c1); transition:width .35s ease; }
+    .study-card-wrap { max-width:700px; margin:0 auto; }
+    .study-card { min-height:370px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:36px 24px 28px; position:relative; overflow:hidden; text-align:center; border-radius:28px; border:1px solid rgba(166,188,226,.17); background:linear-gradient(155deg,rgba(26,39,61,.97),rgba(15,23,38,.98)); box-shadow:0 28px 90px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); transition:border-color .25s, box-shadow .25s; }
+    .study-card::before { content:""; position:absolute; width:310px; height:310px; top:-220px; right:-120px; border-radius:50%; background:rgba(129,160,255,.10); filter:blur(1px); }
+    .study-card.listening { border-color:rgba(101,215,190,.65); box-shadow:0 0 0 4px rgba(80,214,160,.07),0 28px 90px rgba(0,0,0,.35); }
+    .study-card.listening .mic-orb { animation:pulse 1.65s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(80,214,160,.22); } 50% { transform:scale(1.055); box-shadow:0 0 0 13px rgba(80,214,160,0); } }
+    .card-overline { z-index:1; color:#8fa7d6; font-size:11px; letter-spacing:.15em; font-weight:800; text-transform:uppercase; }
+    .word-prompt { z-index:1; margin:23px 0 10px; font-size:clamp(39px,8vw,66px); line-height:1.05; letter-spacing:-.055em; font-weight:780; overflow-wrap:anywhere; }
+    .prompt-sub { z-index:1; color:var(--muted); font-size:14px; }
+    .mic-orb { z-index:1; width:64px; height:64px; margin:27px 0 13px; display:grid; place-items:center; border-radius:22px; color:#87e3c5; background:rgba(80,214,160,.10); border:1px solid rgba(80,214,160,.2); }
+    .mic-orb svg { width:27px; height:27px; }
+    .status-line { z-index:1; min-height:22px; color:#a8b7d0; font-size:13px; }
+    .status-line.good { color:var(--green); font-weight:750; }
+    .status-line.bad { color:var(--red); font-weight:750; }
+    .status-line.warn { color:var(--yellow); }
+    .answer-result { z-index:1; display:none; margin-top:18px; padding:13px 17px; border-radius:15px; max-width:100%; background:rgba(255,255,255,.045); border:1px solid var(--line); }
+    .answer-result.show { display:block; }
+    .answer-result .answer-label { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.12em; font-weight:800; }
+    .answer-result .answer-value { margin-top:5px; font-size:22px; font-weight:750; overflow-wrap:anywhere; }
+    .answer-result .heard-value { margin-top:7px; color:#aab9d0; font-size:12px; overflow-wrap:anywhere; }
+    .manual-answer { z-index:1; display:none; width:min(100%,420px); margin-top:17px; gap:8px; }
+    .manual-answer.show { display:flex; }
+    .manual-answer input { min-width:0; flex:1; }
+    .study-controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin:19px 0 0; }
+    .study-controls .btn { min-height:48px; }
+    .mic-btn { color:#081a17; background:linear-gradient(135deg,#8de5c5,#53cfa5); }
+    .study-hint { max-width:650px; margin:17px auto 0; color:#73829c; font-size:11px; text-align:center; line-height:1.5; }
+    .keyboard-note { color:#73829c; font-size:11px; text-align:center; margin:15px 0 0; }
+    .finish-card { max-width:610px; margin:30px auto 0; padding:30px; text-align:center; }
+    .finish-mark { width:64px; height:64px; margin:0 auto 18px; display:grid; place-items:center; border-radius:22px; background:rgba(80,214,160,.1); color:var(--green); font-size:30px; }
+    .finish-card h1 { font-size:38px; }
+    .finish-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:24px 0; }
+    .finish-stat { padding:15px 8px; border:1px solid var(--line); border-radius:15px; background:rgba(255,255,255,.025); }
+    .finish-stat strong { display:block; font-size:25px; }
+    .finish-stat span { color:var(--muted); font-size:11px; }
+    .finish-actions { display:flex; gap:9px; justify-content:center; flex-wrap:wrap; }
+
+    /* Modal */
+    .modal-backdrop { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(1,4,10,.72); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+    .modal-backdrop.show { display:flex; }
+    .modal { width:min(100%,620px); max-height:min(88vh,850px); overflow:auto; padding:22px; border-radius:24px; border:1px solid var(--line); background:#111a2a; box-shadow:0 30px 100px rgba(0,0,0,.5); }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:9px; flex-wrap:wrap; margin-top:16px; }
+    .toast { position:fixed; z-index:50; left:50%; bottom:calc(22px + env(safe-area-inset-bottom)); transform:translate(-50%,20px); opacity:0; pointer-events:none; padding:12px 16px; max-width:calc(100% - 30px); border:1px solid var(--line); border-radius:14px; background:#1b2940; color:#eaf0fb; font-size:13px; box-shadow:0 16px 50px rgba(0,0,0,.4); transition:opacity .2s, transform .2s; }
+    .toast.show { opacity:1; transform:translate(-50%,0); }
+    .file-input { display:none; }
+    .footer { margin-top:54px; padding-top:18px; border-top:1px solid rgba(166,188,226,.08); display:flex; justify-content:space-between; gap:12px; color:#65748d; font-size:11px; }
+    .footer span:last-child { text-align:right; }
+    @media (max-width:640px) {
+      .shell { width:min(100% - 24px, 980px); padding-top:14px; }
+      .topbar { margin-bottom:36px; }
+      .privacy-pill { display:none; }
+      .hero-copy { font-size:14px; margin-bottom:24px; }
+      .import-panel { padding:16px; }
+      .field-row { grid-template-columns:1fr; gap:0; }
+      .packs-grid { grid-template-columns:1fr; }
+      .section-head { margin-top:29px; }
+      .study-card { min-height:350px; padding:28px 17px 22px; border-radius:25px; }
+      .study-top { margin-bottom:18px; }
+      .study-controls { gap:8px; }
+      .study-controls .btn { flex:1; min-width:calc(50% - 5px); padding:0 10px; font-size:13px; }
+      .study-controls .btn-secondary { flex:0 0 100%; }
+      .finish-card { padding:24px 17px; }
+      .footer { flex-direction:column; }
+      .footer span:last-child { text-align:left; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 4.5h8.8A2.2 2.2 0 0 1 18 6.7v12.8H8.4A2.4 2.4 0 0 1 6 17.1V5.5a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8"/><path d="M8 8h6.5M8 11.5h6.5M8 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <span>wordwave</span>
+      </div>
+      <div class="top-actions">
+        <span class="privacy-pill">PRIVATE · LOCAL</span>
+        <button class="icon-btn" id="backupBtn" title="Экспорт всех наборов" aria-label="Экспорт всех наборов"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></button>
+        <button class="icon-btn" id="restoreBtn" title="Импорт JSON" aria-label="Импорт JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></button>
+        <input class="file-input" id="restoreFile" type="file" accept="application/json,.json">
+      </div>
+    </header>
+
+    <main>
+      <section class="view active" id="homeView">
+        <p class="eyebrow">YOUR PERSONAL VOCABULARY TRAINER</p>
+        <h1>Слова, которые<br>становятся твоими.</h1>
+        <p class="hero-copy">Загружай словари, слушай русское слово и отвечай по-английски. Тренируйся голосом — в своём темпе и без потери прогресса.</p>
+
+        <section class="panel import-panel" aria-labelledby="importTitle">
+          <div class="section-head" style="margin:0 0 17px">
+            <div><p class="eyebrow" style="margin-bottom:7px">NEW COLLECTION</p><h2 id="importTitle">Импорт слов</h2></div>
+            <span class="section-note">до 5 000 слов в наборе</span>
+          </div>
+          <div class="field"><label class="field-label" for="packName">Название набора</label><input class="text-input" id="packName" maxlength="80" placeholder="Например, B2 — Work & Business"></div>
+          <div class="field"><label class="field-label" for="wordsInput">Слова и переводы</label><textarea class="text-area" id="wordsInput" spellcheck="false" placeholder="покидать - abandon&#10;достигать: achieve&#10;осведомлённый: aware&#10;поддерживать — to maintain"></textarea>
+            <p class="hint">Поддерживаются разделители: табуляция, двоеточие, дефис или длинное тире с пробелами. Первая колонка — русский вопрос, вторая — английский ответ. Несколько допустимых переводов можно разделить символом ;</p>
+          </div>
+          <div class="form-actions">
+            <span class="section-note" id="parsePreview">Вставь список — я разберу его автоматически.</span>
+            <button class="btn" id="createPackBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Создать набор</button>
+          </div>
+          <div class="import-feedback" id="importFeedback" role="status"></div>
+        </section>
+
+        <div class="section-head">
+          <div><p class="eyebrow" style="margin-bottom:7px">YOUR LIBRARY</p><h2>Мои наборы</h2></div>
+          <div class="toolbar-row"><span class="section-note" id="totalWords">0 слов · 0 наборов</span></div>
+        </div>
+        <div class="packs-grid" id="packsGrid"></div>
+        <p class="storage-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 4v5h8V4M8 15h8"/></svg><span>Все данные хранятся локально в этом браузере. Экспортируй JSON-копию и импортируй её на другом устройстве, чтобы перенести словари и статистику.</span></p>
+      </section>
+
+      <section class="view" id="studyView">
+        <div class="study-top">
+          <button class="back-btn" id="backHomeBtn">← Мои наборы</button>
+          <span class="study-pack-name" id="studyPackName"></span>
+        </div>
+        <div id="studyActive">
+          <div class="progress-block">
+            <div class="progress-label"><span id="progressCount">Слово 1 из 1</span><span id="progressPercent">0%</span></div>
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+          <div class="study-card-wrap">
+            <article class="study-card" id="studyCard">
+              <span class="card-overline">TRANSLATE INTO ENGLISH</span>
+              <div class="word-prompt" id="promptWord">Загрузка…</div>
+              <div class="prompt-sub" id="promptSub">Произнеси перевод на английском</div>
+              <div class="mic-orb" id="micOrb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-3 0h6"/></svg></div>
+              <div class="status-line" id="statusLine" aria-live="polite">Слушай слово…</div>
+              <div class="answer-result" id="answerResult"><div class="answer-label" id="answerLabel">Правильный ответ</div><div class="answer-value" id="answerValue"></div><div class="heard-value" id="heardValue"></div></div>
+              <div class="manual-answer" id="manualAnswer"><input class="text-input" id="manualInput" placeholder="Введи ответ вручную" autocomplete="off" autocapitalize="none"><button class="btn" id="manualCheckBtn">Проверить</button></div>
+            </article>
+            <div class="study-controls">
+              <button class="btn mic-btn" id="startMicBtn">🎙 Начать запись</button>
+              <button class="btn btn-secondary" id="repeatWordBtn">↻ Повторить слово</button>
+              <button class="btn btn-ghost" id="skipBtn">Не знаю / Пропустить →</button>
+            </div>
+            <p class="study-hint" id="studyHint">После озвучки микрофон включится автоматически. Говори отчётливо, когда увидишь пульсацию.</p>
+          </div>
+        </div>
+        <div class="panel finish-card" id="finishCard" style="display:none">
+          <div class="finish-mark">✓</div><p class="eyebrow">SESSION COMPLETE</p><h1>Отличная работа.</h1><p style="color:var(--muted);margin:10px 0 0">Тренировка завершена. Вот твой результат:</p>
+          <div class="finish-stats"><div class="finish-stat"><strong id="finishCorrect">0</strong><span>Правильно</span></div><div class="finish-stat"><strong id="finishWrong">0</strong><span>Ошибки</span></div><div class="finish-stat"><strong id="finishSkipped">0</strong><span>Пропущено</span></div></div>
+          <div class="finish-actions"><button class="btn" id="restartBtn">Пройти ещё раз</button><button class="btn btn-secondary" id="finishHomeBtn">К наборам</button></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer"><span>WORDWAVE · PERSONAL VOCABULARY</span><span>Сделано для ежедневной практики ♡</span></footer>
+  </div>
+
+  <div class="modal-backdrop" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal">
+      <div class="modal-head"><div><p class="eyebrow" style="margin-bottom:6px">EDIT COLLECTION</p><h2 id="editTitle">Редактировать набор</h2></div><button class="icon-btn" id="closeEditBtn" aria-label="Закрыть">✕</button></div>
+      <div class="field"><label class="field-label" for="editPackName">Название</label><input class="text-input" id="editPackName" maxlength="80"></div>
+      <div class="field"><label class="field-label" for="editWordsInput">Слова (одна пара на строку)</label><textarea class="text-area" id="editWordsInput" style="min-height:280px" spellcheck="false"></textarea><p class="hint">При сохранении текущая статистика сохранится для слов с тем же вопросом и переводом.</p></div>
+      <div class="modal-actions"><button class="btn btn-secondary" id="cancelEditBtn">Отмена</button><button class="btn" id="saveEditBtn">Сохранить изменения</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const DB_NAME = 'wordwave-db';
+    const DB_VERSION = 1;
+    const MAX_WORDS_PER_PACK = 5000;
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      db: null,
+      packs: [],
+      currentPack: null,
+      order: [],
+      index: 0,
+      correct: 0,
+      wrong: 0,
+      skipped: 0,
+      phase: 'idle',
+      recognition: null,
+      recognitionAttempt: 0,
+      recognitionGotResult: false,
+      intentionalStop: false,
+      listenWatchdog: null,
+      advanceTimer: null,
+      toastTimer: null,
+      editPackId: null,
+      sessionToken: 0,
+      manualMode: false
+    };
+
+    function uuid() {
+      if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+      return 'ww-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) return reject(new Error('Этот браузер не поддерживает IndexedDB.'));
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('packs')) db.createObjectStore('packs', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('words')) {
+            const words = db.createObjectStore('words', { keyPath: 'id' });
+            words.createIndex('byPack', 'packId', { unique: false });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Не удалось открыть базу данных.'));
+        request.onblocked = () => reject(new Error('База заблокирована другой вкладкой. Закрой лишние вкладки и обнови страницу.'));
+      });
+    }
+
+    function transactionDone(tx) {
+      return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('Ошибка базы данных.'));
+        tx.onabort = () => reject(tx.error || new Error('Операция с базой данных отменена.'));
+      });
+    }
+
+    async function getAllPacks() {
+      const tx = state.db.transaction(['packs', 'words'], 'readonly');
+      const packReq = tx.objectStore('packs').getAll();
+      const wordReq = tx.objectStore('words').getAll();
+      const [packs, words] = await Promise.all([
+        new Promise((res, rej) => { packReq.onsuccess = () => res(packReq.result); packReq.onerror = () => rej(packReq.error); }),
+        new Promise((res, rej) => { wordReq.onsuccess = () => res(wordReq.result); wordReq.onerror = () => rej(wordReq.error); })
+      ]);
+      await transactionDone(tx);
+      const counts = new Map();
+      const stats = new Map();
+      words.forEach(w => {
+        counts.set(w.packId, (counts.get(w.packId) || 0) + 1);
+        const s = stats.get(w.packId) || { correct: 0, wrong: 0 };
+        s.correct += Number(w.stats?.correct || 0);
+        s.wrong += Number(w.stats?.wrong || 0);
+        stats.set(w.packId, s);
+      });
+      return packs.map(p => ({ ...p, wordCount: counts.get(p.id) || 0, aggregate: stats.get(p.id) || { correct: 0, wrong: 0 } })).sort((a,b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+
+    async function getPack(id) {
+      const tx = state.db.transaction(['packs', 'words'], 'readonly');
+      const pReq = tx.objectStore('packs').get(id);
+      const wReq = tx.objectStore('words').index('byPack').getAll(IDBKeyRange.only(id));
+      const [pack, words] = await Promise.all([
+        new Promise((res, rej) => { pReq.onsuccess = () => res(pReq.result); pReq.onerror = () => rej(pReq.error); }),
+        new Promise((res, rej) => { wReq.onsuccess = () => res(wReq.result); wReq.onerror = () => rej(wReq.error); })
+      ]);
+      await transactionDone(tx);
+      if (!pack) return null;
+      words.sort((a,b) => (a.position || 0) - (b.position || 0));
+      return { ...pack, words };
+    }
+
+    async function savePack(pack, words) {
+      const tx = state.db.transaction(['packs', 'words'], 'readwrite');
+      const packStore = tx.objectStore('packs');
+      const wordStore = tx.objectStore('words');
+      packStore.put(pack);
+      const cursorReq = wordStore.index('byPack').openCursor(IDBKeyRange.only(pack.id));
+      cursorReq.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) { cursor.delete(); cursor.continue(); }
+        else words.forEach((word, index) => wordStore.put({ ...word, packId: pack.id, position: index }));
+      };
+      cursorReq.onerror = () => tx.abort();
+      await transactionDone(tx);
+    }
+
+    async function updateWordRecord(word) {
+      const tx = state.db.transaction('words', 'readwrite');
+      tx.objectStore('words').put(word);
+      await transactionDone(tx);
+    }
+
+    async function deletePack(id) {
+      const tx = state.db.transaction(['packs', 'words'], 'readwrite');
+      tx.objectStore('packs').delete(id);
+      const req = tx.objectStore('words').index('byPack').openCursor(IDBKeyRange.only(id));
+      req.onsuccess = (e) => { const c = e.target.result; if (c) { c.delete(); c.continue(); } };
+      await transactionDone(tx);
+    }
+
+    function normalizeAnswer(value) {
+      return String(value ?? '').normalize('NFKC').toLocaleLowerCase('en-US')
+        .replace(/[’‘`]/g, "'")
+        .replace(/[\p{P}\p{S}]/gu, '')
+        .replace(/\s+/g, ' ').trim();
+    }
+
+    function splitAnswers(value) {
+      return String(value || '').split(/[;|]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    function parseWordList(text) {
+      const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+      const parsed = [];
+      const errors = [];
+      const byPrompt = new Map();
+      let duplicates = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i].trim();
+        if (!raw || raw.startsWith('#')) continue;
+        let parts = null;
+        if (raw.includes('\t')) parts = raw.split('\t');
+        else {
+          const dash = raw.match(/\s+[—–-]\s+/);
+          if (dash) { const idx = dash.index; parts = [raw.slice(0, idx), raw.slice(idx + dash[0].length)]; }
+          else {
+            const colon = raw.indexOf(':');
+            if (colon > 0) parts = [raw.slice(0, colon), raw.slice(colon + 1)];
+          }
+        }
+        if (!parts || parts.length < 2) { errors.push(`Строка ${i + 1}: не найден разделитель между словом и переводом.`); continue; }
+        const prompt = String(parts[0] || '').trim();
+        const answer = String(parts.slice(1).join(' ').trim());
+        if (!prompt || !answer) { errors.push(`Строка ${i + 1}: пустое слово или перевод.`); continue; }
+        if (prompt.length > 160 || answer.length > 240) { errors.push(`Строка ${i + 1}: слишком длинная запись (максимум 160/240 символов).`); continue; }
+        const key = normalizeAnswer(prompt);
+        if (byPrompt.has(key)) {
+          duplicates++;
+          const existing = byPrompt.get(key);
+          const answers = new Set(splitAnswers(existing.answer).map(normalizeAnswer));
+          splitAnswers(answer).forEach(a => { if (!answers.has(normalizeAnswer(a))) existing.answer += '; ' + a; });
+          continue;
+        }
+        const entry = { id: uuid(), prompt, answer, stats: { correct: 0, wrong: 0, skipped: 0, seen: 0, lastSeenAt: null } };
+        parsed.push(entry);
+        byPrompt.set(key, entry);
+      }
+      return { words: parsed, errors, duplicates, nonEmptyLines: lines.filter(l => l.trim() && !l.trim().startsWith('#')).length };
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function showToast(message) {
+      const el = $('toast'); el.textContent = message; el.classList.add('show');
+      clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    function formatDate(timestamp) {
+      if (!timestamp) return 'Ещё не тренировался';
+      return 'Обновлён ' + new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'short' }).format(new Date(timestamp));
+    }
+
+    async function refreshHome() {
+      state.packs = await getAllPacks();
+      const total = state.packs.reduce((sum,p) => sum + p.wordCount, 0);
+      $('totalWords').textContent = `${total.toLocaleString('ru-RU')} слов · ${state.packs.length} наборов`;
+      const grid = $('packsGrid'); grid.innerHTML = '';
+      if (!state.packs.length) {
+        grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✦</div><strong>Пока здесь пусто</strong>Создай первый набор выше — и начни превращать слова в активный словарный запас.</div>';
+        return;
+      }
+      state.packs.forEach(pack => {
+        const card = document.createElement('article'); card.className = 'pack-card';
+        const totalLearned = pack.aggregate.correct + pack.aggregate.wrong;
+        card.innerHTML = `
+          <div class="pack-top"><div class="pack-name">${escapeHtml(pack.name)}</div><span class="pack-count">${pack.wordCount.toLocaleString('ru-RU')} слов</span></div>
+          <div class="pack-meta">${escapeHtml(formatDate(pack.updatedAt))}</div>
+          <div class="pack-stats">✓ ${pack.aggregate.correct} правильно · ${totalLearned} ответов</div>
+          <div class="pack-actions">
+            <button class="btn" data-action="study" data-id="${escapeHtml(pack.id)}">Начать учить</button>
+            <button class="btn btn-secondary" data-action="edit" data-id="${escapeHtml(pack.id)}">Изменить</button>
+            <button class="btn btn-ghost" data-action="export" data-id="${escapeHtml(pack.id)}" title="Экспорт набора">JSON ↓</button>
+            <button class="btn btn-ghost btn-danger" data-action="delete" data-id="${escapeHtml(pack.id)}">Удалить</button>
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function setView(view) {
+      $('homeView').classList.toggle('active', view === 'home');
+      $('studyView').classList.toggle('active', view === 'study');
+      window.scrollTo({ top:0, behavior:'smooth' });
+    }
+
+    function recognitionCtor() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+
+    function stopRecognition(abort = true) {
+      clearTimeout(state.listenWatchdog); state.listenWatchdog = null;
+      const rec = state.recognition;
+      state.recognition = null;
+      state.intentionalStop = true;
+      if (rec && abort) { try { rec.abort(); } catch (_) {} }
+      state.intentionalStop = false;
+      $('studyCard').classList.remove('listening');
+    }
+
+    function cancelSpeech() {
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+      }
+    }
+
+    function speak(text, lang) {
+      return new Promise(resolve => {
+        if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return resolve(false);
+        cancelSpeech();
+        const utterance = new SpeechSynthesisUtterance(String(text));
+        utterance.lang = lang;
+        utterance.rate = lang.startsWith('ru') ? 0.92 : 0.9;
+        utterance.pitch = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) || voices.find(v => v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()));
+        if (voice) utterance.voice = voice;
+        let settled = false;
+        const finish = (ok) => { if (settled) return; settled = true; clearTimeout(fallback); resolve(ok); };
+        utterance.onend = () => finish(true);
+        utterance.onerror = () => finish(false);
+        const fallback = setTimeout(() => finish(false), Math.max(6000, String(text).length * 180));
+        try { window.speechSynthesis.speak(utterance); }
+        catch (_) { finish(false); }
+      });
+    }
+
+    function updateProgress() {
+      const total = state.order.length;
+      const current = Math.min(state.index + 1, total);
+      $('progressCount').textContent = `Слово ${current} из ${total}`;
+      const percent = total ? Math.round((state.index / total) * 100) : 0;
+      $('progressPercent').textContent = `${percent}%`;
+      $('progressFill').style.width = `${percent}%`;
+    }
+
+    function setStatus(message, type = '') {
+      const line = $('statusLine'); line.textContent = message; line.className = 'status-line' + (type ? ' ' + type : '');
+    }
+
+    function showManualInput(show = true) {
+      state.manualMode = show;
+      $('manualAnswer').classList.toggle('show', show);
+      if (show) setTimeout(() => $('manualInput').focus({ preventScroll:true }), 80);
+    }
+
+    function recognitionStalled(rec) {
+      if (state.recognition !== rec || state.recognitionGotResult) return;
+      try { rec.abort(); } catch (_) {}
+      state.recognition = null;
+      $('studyCard').classList.remove('listening');
+      state.phase = 'waiting';
+      setStatus('Распознавание зависло или не услышало ответ. Попробуй ещё раз.', 'warn');
+      showManualInput(true);
+      $('startMicBtn').textContent = '🎙 Повторить запись';
+    }
+
+    async function beginStudy(packId) {
+      const pack = await getPack(packId);
+      if (!pack || !pack.words.length) return showToast('В этом наборе пока нет слов.');
+      clearTimeout(state.advanceTimer); clearTimeout(state.listenWatchdog); cancelSpeech(); stopRecognition();
+      state.currentPack = pack;
+      state.order = pack.words.map((_, i) => i);
+      // Перемешиваем набор, чтобы порядок не заучивался механически.
+      for (let i = state.order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [state.order[i], state.order[j]] = [state.order[j], state.order[i]]; }
+      state.index = 0; state.correct = 0; state.wrong = 0; state.skipped = 0; state.phase = 'prompt'; state.recognitionAttempt = 0;
+      state.sessionToken++;
+      $('studyPackName').textContent = pack.name;
+      $('studyActive').style.display = 'block'; $('finishCard').style.display = 'none';
+      setView('study');
+      await renderCurrentWord();
+    }
+
+    async function renderCurrentWord() {
+      const token = state.sessionToken;
+      if (!state.currentPack || state.index >= state.order.length) return finishStudy();
+      clearTimeout(state.advanceTimer); clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech();
+      const word = state.currentPack.words[state.order[state.index]];
+      state.phase = 'prompt'; state.recognitionAttempt = 0; state.recognitionGotResult = false;
+      $('studyCard').classList.remove('listening');
+      $('promptWord').textContent = word.prompt;
+      $('promptSub').textContent = 'Произнеси перевод на английском';
+      $('answerResult').classList.remove('show'); $('answerValue').textContent = ''; $('heardValue').textContent = '';
+      showManualInput(false); $('manualInput').value = '';
+      $('micOrb').style.display = 'grid';
+      $('startMicBtn').style.display = 'inline-flex';
+      $('startMicBtn').textContent = '🎙 Начать запись';
+      $('studyHint').textContent = 'После озвучки микрофон включится автоматически. Если Safari не запустит его сам, нажми «Начать запись».';
+      updateProgress();
+      setStatus('Слушай русское слово…');
+      const spoken = await speak(word.prompt, 'ru-RU');
+      if (token !== state.sessionToken || state.phase !== 'prompt') return;
+      if (!spoken) setStatus('Не удалось озвучить автоматически. Нажми «Повторить слово».', 'warn');
+      else setStatus('Теперь скажи перевод по-английски…');
+      // Небольшая пауза снижает вероятность конфликта аудиосессий в Safari.
+      setTimeout(() => { if (token === state.sessionToken && state.phase === 'prompt') startListening(false); }, 350);
+    }
+
+    function startListening(fromUser = false) {
+      if (!state.currentPack || state.phase === 'checking' || state.phase === 'result' || state.phase === 'finished') return;
+      const Recognition = recognitionCtor();
+      if (!Recognition) {
+        setStatus('Распознавание речи недоступно в этом браузере. Введи ответ вручную.', 'warn');
+        showManualInput(true); $('startMicBtn').style.display = 'none';
+        $('studyHint').textContent = 'Попробуй Safari или Chrome с поддержкой SpeechRecognition. Ручная проверка доступна всегда.';
+        return;
+      }
+      stopRecognition();
+      cancelSpeech();
+      state.phase = 'listening'; state.recognitionAttempt++;
+      state.recognitionGotResult = false;
+      const rec = new Recognition();
+      state.recognition = rec;
+      rec.lang = 'en-US'; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
+      rec.onstart = () => {
+        if (state.recognition !== rec) return;
+        state.phase = 'listening'; $('studyCard').classList.add('listening');
+        setStatus('Слушаю… Говори сейчас');
+        $('startMicBtn').textContent = '🎙 Слушаю…';
+        clearTimeout(state.listenWatchdog);
+        state.listenWatchdog = setTimeout(() => recognitionStalled(rec), 12000);
+      };
+      rec.onresult = (event) => {
+        if (state.recognition !== rec || state.phase !== 'listening') return;
+        clearTimeout(state.listenWatchdog); state.recognitionGotResult = true;
+        const alternatives = [];
+        const result = event.results?.[event.resultIndex || 0];
+        if (result) for (let i = 0; i < result.length; i++) if (result[i]?.transcript) alternatives.push(result[i].transcript.trim());
+        const transcript = alternatives[0] || '';
+        const word = state.currentPack.words[state.order[state.index]];
+        const expected = splitAnswers(word.answer).map(normalizeAnswer).filter(Boolean);
+        const match = alternatives.some(candidate => expected.includes(normalizeAnswer(candidate)));
+        handleAnswer(transcript, match, false);
+      };
+      rec.onerror = (event) => {
+        if (state.recognition !== rec || state.phase === 'result') return;
+        clearTimeout(state.listenWatchdog); state.recognition = null;
+        $('studyCard').classList.remove('listening');
+        const messages = {
+          'not-allowed':'Нет доступа к микрофону. Разреши микрофон для сайта в настройках Safari.',
+          'service-not-allowed':'Сервис распознавания речи запрещён браузером.',
+          'no-speech':'Не услышал речь. Попробуй говорить чуть громче.',
+          'audio-capture':'Не удалось подключиться к микрофону.',
+          'network':'Ошибка сетевого сервиса распознавания. Проверь интернет.',
+          'aborted':'Запись остановлена.'
+        };
+        const message = messages[event.error] || `Ошибка распознавания: ${event.error || 'неизвестно'}.`;
+        state.phase = 'waiting';
+        setStatus(message, 'warn');
+        showManualInput(true);
+        $('startMicBtn').textContent = '🎙 Повторить запись';
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          $('studyHint').textContent = 'Проверь разрешение микрофона и включена ли Siri: Safari использует системный движок распознавания Apple.';
+        }
+      };
+      rec.onend = () => {
+        if (state.recognition !== rec) return;
+        clearTimeout(state.listenWatchdog); state.recognition = null;
+        $('studyCard').classList.remove('listening');
+        if (!state.recognitionGotResult && state.phase === 'listening') {
+          state.phase = 'waiting';
+          setStatus('Не удалось распознать ответ. Попробуй ещё раз или введи его.', 'warn');
+          showManualInput(true); $('startMicBtn').textContent = '🎙 Повторить запись';
+        }
+      };
+      try {
+        rec.start();
+        // Some WebKit builds may never dispatch onstart/onerror/onend. Keep a guard even before onstart.
+        state.listenWatchdog = setTimeout(() => recognitionStalled(rec), 16000);
+        $('startMicBtn').textContent = '🎙 Запись';
+        showManualInput(false);
+      } catch (error) {
+        state.recognition = null; state.phase = 'waiting';
+        $('studyCard').classList.remove('listening');
+        setStatus(fromUser ? 'Браузер не смог включить микрофон. Проверь разрешения.' : 'Safari не запустил микрофон автоматически. Нажми «Начать запись».', 'warn');
+        $('startMicBtn').textContent = '🎙 Начать запись';
+        showManualInput(true);
+      }
+    }
+
+    async function handleAnswer(transcript, matched, manual) {
+      if (state.phase === 'result' || state.phase === 'finished') return;
+      stopRecognition(); cancelSpeech();
+      state.phase = 'checking';
+      const word = state.currentPack.words[state.order[state.index]];
+      word.stats = word.stats || { correct:0, wrong:0, skipped:0, seen:0, lastSeenAt:null };
+      word.stats.seen = (word.stats.seen || 0) + 1;
+      word.stats.lastSeenAt = Date.now();
+      $('answerResult').classList.add('show');
+      $('answerValue').textContent = splitAnswers(word.answer).join(' / ');
+      $('heardValue').textContent = transcript ? `Ты сказал: ${transcript}` : (manual ? 'Ответ введён вручную' : '');
+      $('answerLabel').textContent = 'Правильный перевод';
+      $('startMicBtn').style.display = 'none';
+      $('micOrb').style.display = 'none';
+      showManualInput(false);
+      if (matched) {
+        state.correct++; word.stats.correct = (word.stats.correct || 0) + 1;
+        state.phase = 'result'; setStatus('Правильно! 🎉', 'good');
+        state.advanceTimer = setTimeout(advance, 1500);
+      } else {
+        state.wrong++; word.stats.wrong = (word.stats.wrong || 0) + 1;
+        state.phase = 'result'; setStatus('Неверно ❌', 'bad');
+        const answerToSay = splitAnswers(word.answer)[0] || word.answer;
+        await speak(`No, it is ${answerToSay}`, 'en-US');
+        state.advanceTimer = setTimeout(advance, 2500);
+      }
+      try { await updateWordRecord(word); } catch (error) { console.error(error); showToast('Не удалось сохранить статистику.'); }
+    }
+
+    async function skipWord() {
+      if (!state.currentPack || state.phase === 'result' || state.phase === 'finished') return;
+      clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech();
+      const word = state.currentPack.words[state.order[state.index]];
+      word.stats = word.stats || { correct:0, wrong:0, skipped:0, seen:0, lastSeenAt:null };
+      word.stats.skipped = (word.stats.skipped || 0) + 1; word.stats.lastSeenAt = Date.now();
+      state.skipped++; state.phase = 'result';
+      $('answerResult').classList.add('show'); $('answerLabel').textContent = 'Правильный ответ';
+      $('answerValue').textContent = splitAnswers(word.answer).join(' / '); $('heardValue').textContent = 'Слово пропущено';
+      $('startMicBtn').style.display = 'none'; $('micOrb').style.display = 'none'; showManualInput(false);
+      setStatus('Ничего страшного — запоминаем!');
+      try { await updateWordRecord(word); } catch (error) { console.error(error); }
+      await speak(`The answer is ${splitAnswers(word.answer)[0] || word.answer}`, 'en-US');
+      state.advanceTimer = setTimeout(advance, 2500);
+    }
+
+    function advance() {
+      if (state.phase === 'finished') return;
+      state.index++;
+      if (state.index >= state.order.length) finishStudy();
+      else renderCurrentWord();
+    }
+
+    function finishStudy() {
+      clearTimeout(state.advanceTimer); clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech();
+      state.phase = 'finished';
+      $('studyActive').style.display = 'none'; $('finishCard').style.display = 'block';
+      $('finishCorrect').textContent = state.correct; $('finishWrong').textContent = state.wrong; $('finishSkipped').textContent = state.skipped;
+      $('progressCount').textContent = `Завершено · ${state.order.length} слов`; $('progressPercent').textContent = '100%'; $('progressFill').style.width = '100%';
+    }
+
+    async function createPack() {
+      const name = $('packName').value.trim();
+      const result = parseWordList($('wordsInput').value);
+      const feedback = $('importFeedback');
+      if (!name) { feedback.textContent = 'Укажи название набора.'; feedback.classList.add('show'); return; }
+      if (!result.words.length) {
+        feedback.textContent = result.errors.length ? result.errors.slice(0,3).join(' ') : 'Не найдено ни одной пары слов.';
+        feedback.classList.add('show'); return;
+      }
+      if (result.words.length > MAX_WORDS_PER_PACK) { feedback.textContent = `В одном наборе максимум ${MAX_WORDS_PER_PACK} уникальных слов. Сейчас: ${result.words.length}.`; feedback.classList.add('show'); return; }
+      const pack = { id:uuid(), name, createdAt:Date.now(), updatedAt:Date.now() };
+      try {
+        await savePack(pack, result.words);
+        $('packName').value = ''; $('wordsInput').value = ''; $('parsePreview').textContent = 'Набор создан — можно добавить следующий.';
+        feedback.classList.remove('show'); await refreshHome(); showToast(`Создан набор «${name}»: ${result.words.length} слов`);
+      } catch (error) { feedback.textContent = 'Не удалось сохранить набор: ' + error.message; feedback.classList.add('show'); }
+    }
+
+    async function openEdit(id) {
+      const pack = await getPack(id); if (!pack) return;
+      state.editPackId = id; $('editPackName').value = pack.name;
+      $('editWordsInput').value = pack.words.map(w => `${w.prompt}\t${w.answer}`).join('\n');
+      $('editModal').classList.add('show');
+    }
+
+    function closeEdit() { $('editModal').classList.remove('show'); state.editPackId = null; }
+
+    async function saveEdit() {
+      if (!state.editPackId) return;
+      const name = $('editPackName').value.trim();
+      if (!name) return showToast('Название не может быть пустым.');
+      const result = parseWordList($('editWordsInput').value);
+      if (!result.words.length) return showToast(result.errors[0] || 'Добавь хотя бы одно слово.');
+      if (result.words.length > MAX_WORDS_PER_PACK) return showToast(`Максимум ${MAX_WORDS_PER_PACK} слов в наборе.`);
+      const old = await getPack(state.editPackId);
+      const oldMap = new Map(old.words.map(w => [normalizeAnswer(w.prompt) + '|' + splitAnswers(w.answer).map(normalizeAnswer).sort().join('|'), w]));
+      const words = result.words.map(w => {
+        const key = normalizeAnswer(w.prompt) + '|' + splitAnswers(w.answer).map(normalizeAnswer).sort().join('|');
+        const previous = oldMap.get(key);
+        return previous ? { ...w, id:previous.id, stats:previous.stats } : w;
+      });
+      await savePack({ ...old, name, updatedAt:Date.now() }, words);
+      closeEdit(); await refreshHome(); showToast('Набор обновлён.');
+    }
+
+    function downloadJson(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function exportPack(id) {
+      const pack = await getPack(id); if (!pack) return;
+      const payload = { schema:'wordwave-backup-v1', exportedAt:new Date().toISOString(), packs:[{ name:pack.name, createdAt:pack.createdAt, updatedAt:pack.updatedAt, words:pack.words.map(w => ({ prompt:w.prompt, answer:w.answer, stats:w.stats })) }] };
+      downloadJson(payload, `wordwave-${pack.name.toLowerCase().replace(/[^a-zа-я0-9]+/gi,'-').replace(/^-|-$/g,'') || 'pack'}.json`);
+    }
+
+    async function exportAll() {
+      const packs = [];
+      for (const item of state.packs) {
+        const p = await getPack(item.id);
+        if (p) packs.push({ name:p.name, createdAt:p.createdAt, updatedAt:p.updatedAt, words:p.words.map(w => ({ prompt:w.prompt, answer:w.answer, stats:w.stats })) });
+      }
+      if (!packs.length) return showToast('Нет наборов для экспорта.');
+      downloadJson({ schema:'wordwave-backup-v1', exportedAt:new Date().toISOString(), packs }, `wordwave-backup-${new Date().toISOString().slice(0,10)}.json`);
+      showToast('Резервная копия подготовлена.');
+    }
+
+    async function importBackup(file) {
+      try {
+        const raw = JSON.parse(await file.text());
+        if (!raw || raw.schema !== 'wordwave-backup-v1' || !Array.isArray(raw.packs)) throw new Error('Неверный формат. Нужен JSON-файл Wordwave.');
+        let imported = 0; let totalWords = 0;
+        for (const item of raw.packs) {
+          if (!item || !Array.isArray(item.words) || !item.words.length) continue;
+          const words = item.words.slice(0, MAX_WORDS_PER_PACK).filter(w => w && String(w.prompt || '').trim() && String(w.answer || '').trim()).map(w => ({
+            id:uuid(), prompt:String(w.prompt).trim(), answer:String(w.answer).trim(),
+            stats:{ correct:Number(w.stats?.correct || 0), wrong:Number(w.stats?.wrong || 0), skipped:Number(w.stats?.skipped || 0), seen:Number(w.stats?.seen || 0), lastSeenAt:w.stats?.lastSeenAt || null }
+          }));
+          if (!words.length) continue;
+          const pack = { id:uuid(), name:String(item.name || 'Импортированный набор').slice(0,80), createdAt:Number(item.createdAt || Date.now()), updatedAt:Date.now() };
+          await savePack(pack, words); imported++; totalWords += words.length;
+        }
+        await refreshHome(); showToast(`Импортировано: ${imported} наборов, ${totalWords} слов.`);
+      } catch (error) { showToast(error.message || 'Не удалось импортировать JSON.'); }
+      finally { $('restoreFile').value = ''; }
+    }
+
+    // Events
+    $('createPackBtn').addEventListener('click', createPack);
+    $('wordsInput').addEventListener('input', () => {
+      const result = parseWordList($('wordsInput').value);
+      $('parsePreview').textContent = result.words.length ? `Найдено ${result.words.length} слов${result.duplicates ? ` · объединено повторов: ${result.duplicates}` : ''}${result.errors.length ? ` · проблем: ${result.errors.length}` : ''}` : 'Вставь список — я разберу его автоматически.';
+    });
+    $('packsGrid').addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action]'); if (!button) return;
+      const id = button.dataset.id; const action = button.dataset.action;
+      try {
+        if (action === 'study') await beginStudy(id);
+        if (action === 'edit') await openEdit(id);
+        if (action === 'export') await exportPack(id);
+        if (action === 'delete') {
+          const pack = state.packs.find(p => p.id === id);
+          if (window.confirm(`Удалить набор «${pack?.name || ''}» и всю его статистику?`)) { await deletePack(id); await refreshHome(); showToast('Набор удалён.'); }
+        }
+      } catch (error) { showToast(error.message || 'Произошла ошибка.'); }
+    });
+    $('backupBtn').addEventListener('click', exportAll);
+    $('restoreBtn').addEventListener('click', () => $('restoreFile').click());
+    $('restoreFile').addEventListener('change', (event) => { const file = event.target.files?.[0]; if (file) importBackup(file); });
+    $('backHomeBtn').addEventListener('click', async () => { clearTimeout(state.advanceTimer); stopRecognition(); cancelSpeech(); state.phase = 'idle'; setView('home'); await refreshHome(); });
+    $('finishHomeBtn').addEventListener('click', async () => { state.phase = 'idle'; setView('home'); await refreshHome(); });
+    $('restartBtn').addEventListener('click', () => state.currentPack && beginStudy(state.currentPack.id));
+    $('skipBtn').addEventListener('click', skipWord);
+    $('startMicBtn').addEventListener('click', () => startListening(true));
+    $('repeatWordBtn').addEventListener('click', async () => {
+      if (!state.currentPack || state.phase === 'result') return;
+      clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech(); state.phase = 'prompt';
+      setStatus('Повторяю слово…');
+      const token = state.sessionToken;
+      await speak(state.currentPack.words[state.order[state.index]].prompt, 'ru-RU');
+      if (token !== state.sessionToken || state.phase !== 'prompt') return;
+      setStatus('Теперь скажи перевод по-английски…');
+      setTimeout(() => { if (token === state.sessionToken && state.phase === 'prompt') startListening(false); }, 350);
+    });
+    $('manualCheckBtn').addEventListener('click', () => {
+      const value = $('manualInput').value.trim(); if (!value) return showToast('Сначала введи ответ.');
+      const word = state.currentPack?.words[state.order[state.index]]; if (!word) return;
+      const expected = splitAnswers(word.answer).map(normalizeAnswer);
+      handleAnswer(value, expected.includes(normalizeAnswer(value)), true);
+    });
+    $('manualInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') $('manualCheckBtn').click(); });
+    $('closeEditBtn').addEventListener('click', closeEdit);
+    $('cancelEditBtn').addEventListener('click', closeEdit);
+    $('saveEditBtn').addEventListener('click', saveEdit);
+    $('editModal').addEventListener('click', (event) => { if (event.target === $('editModal')) closeEdit(); });
+    window.addEventListener('beforeunload', () => { clearTimeout(state.advanceTimer); clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech(); });
+
+    async function init() {
+      try {
+        state.db = await openDatabase();
+        await refreshHome();
+      } catch (error) {
+        $('packsGrid').innerHTML = `<div class="empty" style="grid-column:1/-1"><strong>Не удалось запустить базу данных</strong>${escapeHtml(error.message)}</div>`;
+      }
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
+      }
+      if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
+      // Ограничиваем ввод заранее и показываем короткое предупреждение.
+      $('wordsInput').setAttribute('maxlength', '1500000');
+    }
+
+    init();
+  })();
+  </script>
+</body>
+</html>
