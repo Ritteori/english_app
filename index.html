@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
+  <meta name="wordwave-build" content="2026-11-04-v5">
   <meta name="description" content="Wordwave — личные наборы английских слов и голосовые тренировки.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -174,7 +175,7 @@
       .study-top { margin-bottom:18px; }
       .study-controls { gap:8px; }
       .study-controls .btn { flex:1; min-width:calc(50% - 5px); padding:0 10px; font-size:13px; }
-      .study-controls .btn-secondary { flex:0 0 100%; }
+      .study-controls .btn-secondary { flex:0 0 auto; }
       .finish-card { padding:24px 17px; }
       .footer { flex-direction:column; }
       .footer span:last-child { text-align:left; }
@@ -247,10 +248,9 @@
               <div class="answer-result" id="answerResult"><div class="answer-label" id="answerLabel">Правильный ответ</div><div class="answer-value" id="answerValue"></div><div class="heard-value" id="heardValue"></div></div>
             </article>
             <div class="study-controls">
-              <button class="btn mic-btn" id="startMicBtn">🎙 Начать запись</button>
-              <button class="btn btn-secondary" id="repeatWordBtn">↻ Повторить слово</button>
+              <button class="btn btn-secondary" id="repeatWordBtn">↻ Повторить русское слово</button>
             </div>
-            <p class="study-hint" id="studyHint">Микрофон включится автоматически. Скажи перевод по-английски или «skip», чтобы перейти дальше.</p>
+            <p class="study-hint" id="studyHint">Отвечай только голосом на английском. Для пропуска скажи «skip». При проблемах с распознаванием приложение повторит слово автоматически.</p>
           </div>
         </div>
         <div class="panel finish-card" id="finishCard" style="display:none">
@@ -261,7 +261,7 @@
       </section>
     </main>
 
-    <footer class="footer"><span>WORDWAVE · PERSONAL VOCABULARY</span><span>Сделано для ежедневной практики ♡</span></footer>
+    <footer class="footer"><span>WORDWAVE · PERSONAL VOCABULARY · v5</span><span>Сделано для ежедневной практики ♡</span></footer>
   </div>
 
   <div class="modal-backdrop" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
@@ -297,6 +297,7 @@
       recognitionGotResult: false,
       recognitionFinalText: '',
       recognitionInterimText: '',
+      recognitionAlternatives: [],
       intentionalStop: false,
       listenWatchdog: null,
       advanceTimer: null,
@@ -455,33 +456,47 @@
       let phrase = String(value || '').normalize('NFKC').toLocaleLowerCase('en-US')
         .replace(/[’‘`]/g, "'")
         .replace(/[ё]/g, 'е')
+        .replace(/[і]/g, 'и')
         .replace(/[^a-zа-я0-9']+/giu, ' ')
         .replace(/\s+/g, ' ').trim();
 
-      // Speech recognition sometimes writes the English command in Cyrillic.
-      phrase = phrase.replace(/(^|\s)скип(?:ни|нуть)?(?=$|\s)/giu, '$1skip');
-      phrase = phrase.replace(/(^|\s)пропустить(?=$|\s)/giu, '$1skip');
-      return phrase.replace(/\s+/g, ' ').trim();
+      // Speech recognizers may return the spoken English command in Cyrillic.
+      phrase = phrase
+        .replace(/(^|\s)(?:скип|скіп)(?:ни|нись|нуть)?(?=$|\s)/giu, '$1skip')
+        .replace(/(^|\s)(?:пропустить|пропусти|пропусти-ка)(?=$|\s)/giu, '$1skip')
+        .replace(/\s+/g, ' ').trim();
+      return phrase;
     }
 
     function isVoiceSkipCommand(candidates, word) {
       const expected = splitAnswers(word?.answer || '').map(normalizeAnswer).filter(Boolean);
-      // If "skip" is itself a valid translation, it must be treated as an answer.
+      const phrases = [...new Set((candidates || []).map(normalizeVoiceCommand).filter(Boolean))];
+
+      // A card whose translation contains the command word is inherently ambiguous;
+      // prefer learning the vocabulary item rather than accidentally skipping it.
+      // Otherwise the dedicated voice command has priority across all ASR alternatives:
+      // the first candidate can be wrong while a later alternative correctly hears "skip".
       if (expected.some(answer => answer.split(' ').includes('skip'))) return false;
 
       const exactCommands = new Set([
-        'skip', 'skip it', 'skip this', 'skip this word', 'skip word', 'skip the word',
-        'please skip', 'please skip it', 'skip card', 'skip next',
-        'skip this card', 'skip phrase', 'skip the phrase', 'skip this phrase',
-        'дальше', 'пропусти', 'пропусти слово'
+        'skip', 'skip it', 'skip this', 'skip this one', 'skip this word',
+        'skip the word', 'please skip', 'please skip it', 'skip card',
+        'skip this card', 'skip the card',
+        'пропусти', 'пропусти слово', 'пропустить'
       ]);
-      return (candidates || []).some(candidate => {
-        const phrase = normalizeVoiceCommand(candidate);
+
+      return phrases.some(phrase => {
         if (exactCommands.has(phrase)) return true;
-        // Accept short natural command variants, but not arbitrary sentences containing "skip".
         const tokens = phrase.split(' ').filter(Boolean);
-        return tokens.includes('skip') && tokens.length <= 5 &&
-          tokens.every(token => ['skip', 'please', 'it', 'this', 'the', 'word', 'card', 'now'].includes(token));
+        // Recognize a short command with harmless filler words, but not a whole
+        // sentence that merely happens to contain the word "skip".
+        if (tokens.includes('skip') && tokens.length <= 5 &&
+            tokens.every(token => ['skip', 'please', 'it', 'this', 'one', 'the', 'word', 'card', 'next', 'now'].includes(token))) {
+          return true;
+        }
+        // A few common ASR spellings of the same short command. Exact vocabulary
+        // matches were checked above, so real target words still win.
+        return ['ski', 'skips', 'skipped', 'skipping', 'scip'].includes(phrase);
       });
     }
 
@@ -639,15 +654,14 @@
       clearTimeout(state.retryTimer);
       state.phase = 'waiting';
       $('studyCard').classList.remove('listening');
-      $('startMicBtn').style.display = 'inline-flex';
-      $('startMicBtn').disabled = true;
 
-      const maxAttempts = 3; // initial attempt + two automatic retries
+      const maxAttempts = 3; // one initial listen + two automatic retries
       if (state.recognitionAttempt < maxAttempts) {
         const nextAttempt = state.recognitionAttempt + 1;
-        setStatus(reason === 'timeout'
-          ? `Не расслышал. Повторяю слово и слушаю снова (${nextAttempt}/${maxAttempts})…`
-          : `Не расслышал ответ. Повторяю слово (${nextAttempt}/${maxAttempts})…`, 'warn');
+        const message = reason === 'network'
+          ? `Нет ответа от сервиса распознавания. Повторяю попытку (${nextAttempt}/${maxAttempts})…`
+          : `Не расслышал. Повторяю русское слово (${nextAttempt}/${maxAttempts})…`;
+        setStatus(message, 'warn');
         const token = state.sessionToken;
         state.retryTimer = setTimeout(async () => {
           if (token !== state.sessionToken || state.phase !== 'waiting') return;
@@ -656,12 +670,12 @@
           await speak(word.prompt, 'ru-RU');
           if (token !== state.sessionToken || state.phase !== 'waiting') return;
           startListening(false);
-        }, 850);
+        }, 900);
       } else {
-        $('startMicBtn').disabled = false;
-        $('startMicBtn').textContent = '🎙 Попробовать ещё';
-        setStatus('Не удалось расслышать. Нажми «Попробовать ещё» и произнеси перевод снова.', 'warn');
-        $('studyHint').textContent = 'Во время тренировки доступен только голосовой ответ. Проверь микрофон и интернет; текстовый ввод отключён.';
+        setStatus('Не удалось распознать ответ. Показываю правильный перевод и перехожу дальше…', 'warn');
+        state.retryTimer = setTimeout(() => {
+          if (state.phase === 'waiting') skipWord(false, '', 'unheard');
+        }, 700);
       }
     }
 
@@ -707,15 +721,12 @@
       $('answerResult').classList.remove('show'); $('answerValue').textContent = ''; $('heardValue').textContent = '';
       clearTimeout(state.retryTimer);
       $('micOrb').style.display = 'grid';
-      $('startMicBtn').style.display = 'inline-flex';
-      $('startMicBtn').textContent = '🎙 Начать запись';
-      $('startMicBtn').disabled = false;
-      $('studyHint').textContent = 'Отвечай голосом на английском. Чтобы пропустить карточку, скажи «skip». Если браузер не расслышит, он автоматически повторит слово и попробует снова.';
+      $('studyHint').textContent = 'Только голосовой ответ. Для пропуска скажи «skip». Если браузер не расслышит, слово будет повторено автоматически; после трёх неудачных попыток приложение покажет перевод и перейдёт дальше.';
       updateProgress();
       setStatus('Слушай русское слово…');
       const spoken = await speak(word.prompt, 'ru-RU');
       if (token !== state.sessionToken || state.phase !== 'prompt') return;
-      if (!spoken) setStatus('Не удалось озвучить автоматически. Нажми «Повторить слово».', 'warn');
+      if (!spoken) setStatus('Не удалось озвучить автоматически. Нажми «Повторить русское слово».', 'warn');
       else setStatus('Теперь скажи перевод по-английски…');
       // Небольшая пауза снижает вероятность конфликта аудиосессий в Safari.
       setTimeout(() => { if (token === state.sessionToken && state.phase === 'prompt') startListening(false); }, 350);
@@ -726,11 +737,8 @@
       const Recognition = recognitionCtor();
       if (!Recognition) {
         state.phase = 'waiting';
-        setStatus('Этот браузер не поддерживает голосовое распознавание. Открой Wordwave в актуальном Chrome или Safari.', 'warn');
-        $('startMicBtn').style.display = 'inline-flex';
-        $('startMicBtn').disabled = true;
-        $('startMicBtn').textContent = 'Голосовой ввод недоступен';
-        $('studyHint').textContent = 'Для тренировки без клавиатуры нужен браузер с поддержкой Web Speech API.';
+        setStatus('Голосовое распознавание недоступно в этом браузере. Нужен актуальный Chrome или Safari.', 'warn');
+        $('studyHint').textContent = 'На этом браузере нет голосового распознавания. Открой сайт в Chrome или Safari с поддержкой Web Speech API.';
         return;
       }
 
@@ -744,6 +752,7 @@
       state.recognitionGotResult = false;
       state.recognitionFinalText = '';
       state.recognitionInterimText = '';
+      state.recognitionAlternatives = [];
 
       let rec;
       try {
@@ -751,8 +760,6 @@
       } catch (error) {
         state.phase = 'waiting';
         setStatus(`Не удалось создать распознавание: ${error.message || error}`, 'warn');
-        $('startMicBtn').disabled = false;
-        $('startMicBtn').textContent = '🎙 Попробовать ещё';
         return;
       }
       state.recognition = rec;
@@ -772,8 +779,6 @@
         if (!isActive()) return;
         $('studyCard').classList.add('listening');
         setStatus('Микрофон подключён. Говори по-английски…', 'live');
-        $('startMicBtn').textContent = '🎙 Слушаю…';
-        $('startMicBtn').disabled = true;
         armWatchdog();
       };
 
@@ -819,6 +824,7 @@
 
         state.recognitionFinalText = finalParts.join(' ').replace(/\s+/g, ' ').trim();
         state.recognitionInterimText = interimParts.join(' ').replace(/\s+/g, ' ').trim();
+        state.recognitionAlternatives = [...new Set(alternatives)];
 
         if (state.recognitionFinalText) {
           clearTimeout(state.listenWatchdog);
@@ -854,16 +860,14 @@
           'aborted':'Запись остановлена.'
         };
         const message = messages[event.error] || `Ошибка распознавания (${event.error || 'unknown'}).`;
-        if (event.error === 'no-speech') {
-          scheduleListeningRetry('no-speech');
+        if (event.error === 'no-speech' || event.error === 'network') {
+          scheduleListeningRetry(event.error);
         } else {
           state.phase = 'waiting';
-          $('startMicBtn').disabled = false;
-          $('startMicBtn').textContent = '🎙 Попробовать ещё';
           setStatus(message, 'warn');
           $('studyHint').textContent = event.error === 'network'
-            ? 'Распознавание речи в этом браузере требует подключения к интернету. Проверь соединение и повтори голосовую попытку.'
-            : 'Текстовый ввод в тренировке отключён. Проверь разрешение микрофона, выбранное устройство и повтори запись.';
+            ? 'Распознавание речи требует интернета. После автоматических повторов приложение покажет правильный ответ и продолжит.'
+            : 'Проверь разрешение микрофона. Нажми «Повторить русское слово», чтобы запустить голосовую попытку заново.';
         }
         console.warn('[Wordwave] SpeechRecognition error:', event.error, event.message || '');
       };
@@ -878,7 +882,7 @@
         // Некоторые движки завершают сессию только с interim-результатом.
         const transcript = state.recognitionFinalText || state.recognitionInterimText;
         if (transcript) {
-          processVoiceTranscript(transcript, []);
+          processVoiceTranscript(transcript, state.recognitionAlternatives || []);
           return;
         }
 
@@ -887,8 +891,6 @@
 
       try {
         setStatus('Запускаю распознавание…', 'live');
-        $('startMicBtn').textContent = '🎙 Подключаюсь…';
-        $('startMicBtn').disabled = true;
         rec.start();
         // Защита на случай, если браузер не вызовет ни onstart, ни onerror, ни onend.
         armWatchdog();
@@ -900,9 +902,7 @@
           ? 'Распознавание уже запущено. Подожди секунду и повтори.'
           : (error?.message || 'Проверь разрешения микрофона.');
         setStatus(`Браузер не смог начать запись: ${detail}`, 'warn');
-        $('startMicBtn').disabled = false;
-        $('startMicBtn').textContent = '🎙 Попробовать ещё';
-        $('studyHint').textContent = 'Голосовой ввод не запустился. Проверь разрешения микрофона и повтори попытку.';
+        $('studyHint').textContent = 'Проверь разрешения микрофона. Нажми «Повторить русское слово», чтобы попробовать снова.';
         console.warn('[Wordwave] SpeechRecognition start failed:', error);
       }
     }
@@ -922,7 +922,6 @@
         ? (matchInfo?.fuzzy ? `Распознано как «${transcript}», засчитано как «${matchInfo.expected}»` : `Ты сказал: ${transcript}`)
         : '';
       $('answerLabel').textContent = 'Правильный перевод';
-      $('startMicBtn').style.display = 'none';
       $('micOrb').style.display = 'none';
       if (matched) {
         state.correct++; word.stats.correct = (word.stats.correct || 0) + 1;
@@ -939,7 +938,7 @@
       try { await updateWordRecord(word); } catch (error) { console.error(error); showToast('Не удалось сохранить статистику.'); }
     }
 
-    async function skipWord(fromVoice = false, recognizedCommand = '') {
+    async function skipWord(fromVoice = false, recognizedCommand = '', reason = 'command') {
       if (!state.currentPack || state.phase === 'checking' || state.phase === 'result' || state.phase === 'finished') return;
       clearTimeout(state.listenWatchdog); stopRecognition(); cancelSpeech();
       const word = state.currentPack.words[state.order[state.index]];
@@ -947,10 +946,13 @@
       word.stats.skipped = (word.stats.skipped || 0) + 1; word.stats.lastSeenAt = Date.now();
       state.skipped++; state.phase = 'result';
       $('answerResult').classList.add('show'); $('answerLabel').textContent = 'Правильный ответ';
-      $('answerValue').textContent = splitAnswers(word.answer).join(' / '); $('heardValue').textContent = fromVoice ? `Команда голосом: skip${recognizedCommand ? ` (распознано: ${recognizedCommand})` : ''}` : 'Слово пропущено';
+      $('answerValue').textContent = splitAnswers(word.answer).join(' / ');
+      $('heardValue').textContent = reason === 'unheard'
+        ? 'Не удалось распознать после трёх попыток'
+        : (fromVoice ? `Команда голосом: skip${recognizedCommand ? ` (распознано: ${recognizedCommand})` : ''}` : 'Слово пропущено');
       clearTimeout(state.retryTimer);
-      $('startMicBtn').style.display = 'none'; $('micOrb').style.display = 'none';
-      setStatus(fromVoice ? 'Пропускаю по голосовой команде…' : 'Ничего страшного — запоминаем!');
+      $('micOrb').style.display = 'none';
+      setStatus(reason === 'unheard' ? 'Не удалось расслышать. Показываю правильный ответ.' : (fromVoice ? 'Команда «skip» распознана. Пропускаю…' : 'Слово пропущено.'), reason === 'unheard' ? 'warn' : '');
       try { await updateWordRecord(word); } catch (error) { console.error(error); }
       await speak(`The answer is ${splitAnswers(word.answer)[0] || word.answer}`, 'en-US');
       state.advanceTimer = setTimeout(advance, 2500);
@@ -1086,11 +1088,10 @@
     $('backHomeBtn').addEventListener('click', async () => { clearTimeout(state.advanceTimer); clearTimeout(state.retryTimer); stopRecognition(); cancelSpeech(); state.phase = 'idle'; setView('home'); await refreshHome(); });
     $('finishHomeBtn').addEventListener('click', async () => { clearTimeout(state.retryTimer); state.phase = 'idle'; setView('home'); await refreshHome(); });
     $('restartBtn').addEventListener('click', () => state.currentPack && beginStudy(state.currentPack.id));
-    $('startMicBtn').addEventListener('click', () => startListening(true));
     $('repeatWordBtn').addEventListener('click', async () => {
       if (!state.currentPack || state.phase === 'result') return;
       clearTimeout(state.listenWatchdog); clearTimeout(state.retryTimer); stopRecognition(); cancelSpeech(); state.phase = 'prompt'; state.recognitionAttempt = 0;
-      setStatus('Повторяю слово…');
+      setStatus('Повторяю русское слово…');
       const token = state.sessionToken;
       await speak(state.currentPack.words[state.order[state.index]].prompt, 'ru-RU');
       if (token !== state.sessionToken || state.phase !== 'prompt') return;
@@ -1111,7 +1112,15 @@
         $('packsGrid').innerHTML = `<div class="empty" style="grid-column:1/-1"><strong>Не удалось запустить базу данных</strong>${escapeHtml(error.message)}</div>`;
       }
       if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-        navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!window.__wordwaveControllerReloaded) {
+            window.__wordwaveControllerReloaded = true;
+            window.location.reload();
+          }
+        });
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+          .then(registration => registration.update().catch(() => {}))
+          .catch(error => console.warn('Service worker:', error));
       }
       if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
       // Ограничиваем ввод заранее и показываем короткое предупреждение.
